@@ -1,6 +1,6 @@
-FROM centos:7
+FROM centos:8
 
-ARG AIRFLOW_VERSION=1.8.2
+ARG AIRFLOW_VERSION=1.10.6
 ENV AIRFLOW_HOME /usr/local/airflow
 
 COPY scripts/entrypoint.sh /entrypoint.sh
@@ -12,26 +12,13 @@ COPY scripts/check_postgres.py ${AIRFLOW_HOME}/check_redis.py
 
 # these are needed only to install necessary packages
 COPY ./yum_requirements.txt /tmp/yum_requirements.txt
+COPY ./pip_requirements.txt /tmp/pip_requirements.txt
 
+# install system and python packages
 RUN  yum -y update \
-    && yum -y install $(cat /tmp/yum_requirements.txt)\
-    && yum -y install epel-release \
-    && yum -y install python34 \
-    && cd /tmp; curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"; /usr/bin/python3.4 get-pip.py \
-    && pip install -I pip==9.0.1 \
-    && yum -y install -t python-requests \
-       python-psycopg2 \
+    && yum -y install $(cat /tmp/yum_requirements.txt) \
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
-    && yum -y install python34-devel \
-    && pip3 install Cython \
-    && pip3 install pytz==2015.7 \
-    && pip3 install pyOpenSSL \
-    && pip3 install ndg-httpsclient \
-    && pip3 install pyasn1 \
-    && pip3 install apache-airflow[celery,postgres]==$AIRFLOW_VERSION \
-    && pip3 install celery[redis]==3.1.17 \
-    && pip3 install nose \
-    && pip3 install pytest \
+    && pip3 install -r /tmp/pip_requirements.txt \
     && yum clean all \
     && rm -rf \
         /var/lib/apt/lists/* \
@@ -39,8 +26,10 @@ RUN  yum -y update \
         /var/tmp/* \
         /usr/share/man \
         /usr/share/doc \
-        /usr/share/doc-base \
-    && chown -R airflow: ${AIRFLOW_HOME} \
+        /usr/share/doc-base
+
+# setup directories and users
+RUN chown -R airflow: ${AIRFLOW_HOME} \
     && mkdir -p /tmp/work/ \
     && chown -R airflow: /tmp/work \
     && chmod 755 /entrypoint.sh \

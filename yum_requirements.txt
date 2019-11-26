@@ -1,7 +1,10 @@
 postgresql-devel
 gcc-c++
 make
-python-devel
 gcc
 libffi-devel
 sudo
+python3
+python3-requests
+python3-psycopg2
+python3-devel
