@@ -1,67 +1,44 @@
-from datetime import timedelta
-import time
-import zipfile
-import os
-
-import requests
-
 import airflow
 from airflow.operators.python_operator import PythonOperator
 from airflow.models import DAG
 
-args = {
-    'owner': 'pycon',
-    'start_date': airflow.utils.dates.days_ago(2),
-    'retry_delay': timedelta(seconds=5),
-}
+import requests
 
-dag = DAG(
-    dag_id='solution3', default_args=args,
-    schedule_interval=None)
+import time
+import zipfile
+import os
 
-
-# executables
-def download_names():
-    location = "https://www.ssa.gov/oact/babynames/state/namesbystate.zip"
-
-    local_filename = "/tmp/work/namesbystate.zip"
-
-    print("Starting download...")
-    r = requests.get(location, stream=True)
-    with open(local_filename, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk:
-                f.write(chunk)
-
-    print("Finished downloading names!")
-    return local_filename
+YEAR_RANGES = [(1880, 1899), (1900, 1949), (1950, 1999), (2000, 2018)]
 
 
 def unzip_names():
-    input_file = "/tmp/work/namesbystate.zip"
+    input_file = "/tmp/work/names.zip"
     names_directory = "/tmp/work/"
 
-    print("Unzipping input...")
-    zip_ref = zipfile.ZipFile(input_file, 'r')
+    print("Starting unzipping...")
+    zip_ref = zipfile.ZipFile(input_file, "r")
     zip_ref.extractall(names_directory)
     zip_ref.close()
-    print("Finished!")
+    print("Unzip finished!")
 
 
-def find_common_for_state(ds, **kwargs):
+def find_common(start_year, end_year):
     names_directory = "/tmp/work"
-    state = kwargs['state']
 
+    files = os.listdir(names_directory)
     names = {}
 
-    print("Starting to find common for state {}...".format(state))
-    with open(os.path.join(names_directory, "{}.TXT".format(state))) as f:
-        for row in f:
-            _, gender, year, name, count = row.split(",")
-            if name in names:
-                names[name] += int(count)
-            else:
-                names[name] = int(count)
+    print("Finding common name...")
+    for f in files:
+        given_year = int(f[3:7])
+        if f.endswith(".txt") and start_year < given_year < end_year:
+            with open(os.path.join(names_directory, f)) as current:
+                for row in current:
+                    name, gender, count = row.split(",")
+                    if name in names:
+                        names[name] += int(count)
+                    else:
+                        names[name] = int(count)
 
     common_name = sorted(names, key=names.get, reverse=True)[0]
     print("Common name is {}".format(common_name))
@@ -69,27 +46,25 @@ def find_common_for_state(ds, **kwargs):
     return common_name
 
 
+def accumulate(**context):
+    common_names = {context['ti'].xcom_pull(task_ids=f"find_common_{start}_{end}") for start, end in YEAR_RANGES}
+    for name in common_names:
+        print(name)
+
+
+
+# dag
+args = {"owner": "Boston Python", "start_date": airflow.utils.dates.days_ago(2)}
+
+dag = DAG(dag_id="Run Me First!", default_args=args, schedule_interval=None)
+
+
 # tasks
-download_task = PythonOperator(
-    task_id='download',
-    python_callable=download_names,
-    dag=dag)
+unzip_task = PythonOperator(task_id="unzip", python_callable=unzip_names, dag=dag)
 
-unzip_task = PythonOperator(
-    task_id='unzip',
-    python_callable=unzip_names,
-    dag=dag)
+accumulate_task = PythonOperator(task_id="unzip", python_callable=accumulate, dag=dag)
 
-states = ['OH', 'OK', 'MI', 'TN', 'TX', 'VT']
+for start, end in YEAR_RANGES:
+    find_common_task = PythonOperator(task_id=f"find_common_{start}_{end}", python_callable=find_common, op_args=[start, end] dag=dag)
+    unzip_task >> find_common_task >> accumulate_task
 
-for state in states:
-    PythonOperator(
-        task_id='find_common_{}'.format(state),
-        op_kwargs={'state': state},
-        python_callable=find_common_for_state,
-        provide_context=True,
-        dag=dag).set_upstream(unzip_task)
-
-
-# dependencies
-unzip_task.set_upstream(download_task)

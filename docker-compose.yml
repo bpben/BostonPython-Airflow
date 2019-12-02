@@ -2,6 +2,7 @@ version: '2'
 
 services:
   redis:
+    container_name: celery_backend
     image: redis:3.2.11
     ports:
       - "6379:6379"
@@ -9,6 +10,7 @@ services:
       - pycon-airflow
 
   postgres:
+    container_name: metadata_db
     image: postgres:10.1
     environment:
       - POSTGRES_USER=pycon
@@ -30,6 +32,7 @@ services:
       - ./dags:/usr/local/airflow/dags
       - ./plugins:/usr/local/airflow/plugins
       - /var/airflow/logs
+      - ./data:/tmp/work
     environment:
       - EXECUTOR=Celery
     command: webserver
@@ -37,6 +40,7 @@ services:
       - pycon-airflow
 
   flower:
+    container_name: celery_flower
     build: .
     restart: always
     environment:
@@ -48,6 +52,7 @@ services:
       - pycon-airflow
 
   scheduler:
+    container_name: scheduler
     build: .
     restart: always
     volumes_from:
@@ -59,6 +64,7 @@ services:
       - pycon-airflow
 
   worker:
+    container_name: celery_worker
     build: .
     privileged: true
     restart: always

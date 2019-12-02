@@ -8,31 +8,7 @@ import time
 import zipfile
 import os
 
-args = {
-    'owner': 'pycon',
-    'start_date': airflow.utils.dates.days_ago(2)
-}
-
-dag = DAG(
-    dag_id='solution2', default_args=args,
-    schedule_interval=None)
-
-
-# executables
-def download_names():
-    location = "https://www.ssa.gov/oact/babynames/names.zip"
-
-    local_filename = "/tmp/work/names.zip"
-
-    print("Starting download...")
-    r = requests.get(location, stream=True)
-    with open(local_filename, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk:
-                f.write(chunk)
-
-    print("Finished downloading names!")
-    return local_filename
+YEAR_RANGES = [(1880, 1899), (1900, 1949), (1950, 1999), (2000, 2018)]
 
 
 def unzip_names():
@@ -40,13 +16,13 @@ def unzip_names():
     names_directory = "/tmp/work/"
 
     print("Starting unzipping...")
-    zip_ref = zipfile.ZipFile(input_file, 'r')
+    zip_ref = zipfile.ZipFile(input_file, "r")
     zip_ref.extractall(names_directory)
     zip_ref.close()
     print("Unzip finished!")
 
 
-def find_common():
+def find_common(start_year, end_year):
     names_directory = "/tmp/work"
 
     files = os.listdir(names_directory)
@@ -54,7 +30,8 @@ def find_common():
 
     print("Finding common name...")
     for f in files:
-        if f.endswith('.txt'):
+        given_year = int(f[3:7])
+        if f.endswith(".txt") and start_year < given_year < end_year:
             with open(os.path.join(names_directory, f)) as current:
                 for row in current:
                     name, gender, count = row.split(",")
@@ -69,23 +46,15 @@ def find_common():
     return common_name
 
 
+# dag
+args = {"owner": "Boston Python", "start_date": airflow.utils.dates.days_ago(2)}
+
+dag = DAG(dag_id="Run Me First!", default_args=args, schedule_interval=None)
+
+
 # tasks
-download_task = PythonOperator(
-    task_id='download',
-    python_callable=download_names,
-    dag=dag)
+unzip_task = PythonOperator(task_id="unzip", python_callable=unzip_names, dag=dag)
 
-unzip_task = PythonOperator(
-    task_id='unzip',
-    python_callable=unzip_names,
-    dag=dag)
-
-find_common_task = PythonOperator(
-    task_id='find_common',
-    python_callable=find_common,
-    dag=dag)
-
-
-# dependencies
-unzip_task.set_upstream(download_task)
-find_common_task.set_upstream(unzip_task)
+for start, end in YEAR_RANGES:
+    find_common_task = PythonOperator(task_id=f"find_common_{start}_{end}", python_callable=find_common, op_args=[start, end] dag=dag)
+    unzip_task >> find_common_task
