@@ -46,7 +46,7 @@ def find_common():
 # dag
 args = {"owner": "Boston Python", "start_date": airflow.utils.dates.days_ago(2)}
 
-dag = DAG(dag_id="Run Me First!", default_args=args, schedule_interval=None)
+dag = DAG(dag_id="first_exercise", default_args=args, schedule_interval=None)
 
 
 # tasks

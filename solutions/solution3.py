@@ -47,16 +47,17 @@ def find_common(start_year, end_year):
 
 
 def accumulate(**context):
-    common_names = {context['ti'].xcom_pull(task_ids=f"find_common_{start}_{end}") for start, end in YEAR_RANGES}
+    common_names = {
+        context["ti"].xcom_pull(task_ids=f"find_common_{start}_{end}") for start, end in YEAR_RANGES
+    }
     for name in common_names:
         print(name)
-
 
 
 # dag
 args = {"owner": "Boston Python", "start_date": airflow.utils.dates.days_ago(2)}
 
-dag = DAG(dag_id="Run Me First!", default_args=args, schedule_interval=None)
+dag = DAG(dag_id="third_exercise", default_args=args, schedule_interval=None)
 
 
 # tasks
@@ -65,6 +66,10 @@ unzip_task = PythonOperator(task_id="unzip", python_callable=unzip_names, dag=da
 accumulate_task = PythonOperator(task_id="unzip", python_callable=accumulate, dag=dag)
 
 for start, end in YEAR_RANGES:
-    find_common_task = PythonOperator(task_id=f"find_common_{start}_{end}", python_callable=find_common, op_args=[start, end] dag=dag)
+    find_common_task = PythonOperator(
+        task_id=f"find_common_{start}_{end}",
+        python_callable=find_common,
+        op_args=[start, end],
+        dag=dag,
+    )
     unzip_task >> find_common_task >> accumulate_task
-
