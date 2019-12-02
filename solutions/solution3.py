@@ -30,8 +30,8 @@ def find_common(start_year, end_year):
 
     print("Finding common name...")
     for f in files:
-        given_year = int(f[3:7])
-        if f.endswith(".txt") and start_year < given_year < end_year:
+        given_year = int(f[3:7]) if f.endswith(".txt") else None
+        if given_year and start_year < given_year < end_year:
             with open(os.path.join(names_directory, f)) as current:
                 for row in current:
                     name, gender, count = row.split(",")
@@ -63,7 +63,9 @@ dag = DAG(dag_id="third_exercise", default_args=args, schedule_interval=None)
 # tasks
 unzip_task = PythonOperator(task_id="unzip", python_callable=unzip_names, dag=dag)
 
-accumulate_task = PythonOperator(task_id="unzip", python_callable=accumulate, dag=dag)
+accumulate_task = PythonOperator(
+    task_id="get_all_common", python_callable=accumulate, provide_context=True, dag=dag
+)
 
 for start, end in YEAR_RANGES:
     find_common_task = PythonOperator(
@@ -72,4 +74,5 @@ for start, end in YEAR_RANGES:
         op_args=[start, end],
         dag=dag,
     )
-    unzip_task >> find_common_task >> accumulate_task
+    unzip_task >> find_common_task
+    find_common_task >> accumulate_task
