@@ -24,6 +24,6 @@ first_task = PythonOperator(
 
 for i in range(5):
     loop_task = PythonOperator(
-        task_id=f"created_in_loop_{i}", python_callable=print_context, dag=dag, op_args=[i]
+        task_id=f"created_in_loop_{i}", python_callable=print_iteration, dag=dag, op_args=[i]
     )
     first_task >> loop_task
