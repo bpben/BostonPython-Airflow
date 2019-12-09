@@ -11,7 +11,7 @@ import os
 YEAR_RANGES = [(1880, 1899), (1900, 1949), (1950, 1999), (2000, 2018)]
 
 
-def unzip_names():
+def unzip_names(**kwargs):
     input_file = "/tmp/work/names.zip"
     names_directory = "/tmp/work/"
 
